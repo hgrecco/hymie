@@ -1,0 +1,21 @@
+{% set form_title = "Recuperar accessso" %}
+
+{% import "bootstrap/wtf.html" as wtf %}
+
+{%- extends "base.html" %}
+
+{% set form_title = "Recuperá tu clave acceso" %}
+
+{% block inner_content %}
+    <main role="main">
+      <section class="jumbotron text-center">
+        <div class="container">
+          <p class="lead text-muted">Haga click en el boton para recuperar el link de acceso al sistema.</p>
+          <p>
+            <a href="{{ recover_link }}" class="btn btn-primary my-2">Recover</a>
+          </p>
+        </div>
+      </section>
+    </main>
+{% endblock %}
+

@@ -1,0 +1,16 @@
+setuptools
+mdform>=0.2
+Flask==1.0.0
+Flask-WTF
+flask-emails
+Flask-Uploads
+Flask-Bootstrap4==4.0.2
+pyyaml
+Werkzeug==0.14.1
+wtforms_components
+serialize
+datastruct
+uwsgidecorators
+flask-htpasswd
+arrow
+email_validator

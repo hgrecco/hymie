@@ -1,0 +1,17 @@
+{%- extends "base.html" %}
+
+{% block inner_content %}
+    {{ super() }}
+    <div class="jumbotron jumbotron-fluid">
+      <div class="container">
+          <div class="card" style="width: 18rem;">
+          <img class="card-img-top" src="/static/toobig.jpg" alt="Card image cap">
+          <div class="card-body">
+            <h5 class="card-title">¡Problemas!</h5>
+            <p class="card-text">Cada archivo no puede superar los 5MB. Volvé atrás, reemplazá el archivo e intentá nuevamente.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+{% endblock %}
+

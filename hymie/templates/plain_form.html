@@ -1,0 +1,19 @@
+<html>
+<head>
+<title>Formulario</title>
+</head>
+<body>
+
+
+<table>
+{% for k, v in form.items() %}
+    <tr>
+        <td>{{ k }}</td>
+        <td>{% if v and v.startswith('http') %}{{ v | urlize(60, target='_blank') }}{% else %}{{ v }}{% endif %}</td>
+    </tr>
+{% endfor %}
+</table>
+
+
+</body>
+</html>

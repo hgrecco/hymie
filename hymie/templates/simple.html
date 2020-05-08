@@ -1,0 +1,12 @@
+{%- extends "base.html" %}
+
+{% block inner_content %}
+    {{ super() }}
+    <div class="jumbotron jumbotron-fluid">
+      <div class="container">
+                {% block inner_simple %}
+                {% endblock %}
+      </div>
+    </div>
+{% endblock %}
+

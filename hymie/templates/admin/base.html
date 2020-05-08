@@ -1,0 +1,16 @@
+{%- extends "/base.html" %}
+
+{% block navbar %}
+    {{ super() }}
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb">
+          {% for text, url in crumbs %}
+            {% if loop.last %}
+                <li class="breadcrumb-item"><a href="{{ url }}">{{ text }}</a></li>
+            {% else %}
+                <li class="breadcrumb-item active" aria-current="page"><a href="{{ url }}">{{ text }}</a></li>
+            {% endif %}
+          {% endfor %}
+      </ol>
+    </nav>
+{% endblock %}

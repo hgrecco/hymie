@@ -1,0 +1,136 @@
+{%- extends "/admin/base.html" %}
+
+{% import "bootstrap/wtf.html" as wtf %}
+
+{%- block breadcrumbs %}
+{{ super() }}
+<a href="/admin/users" href="alert-link">Ver estudiantes</a>
+{% endblock %}
+
+{% block inner_content %}
+    {{ super() }}
+<main role="main">
+   <div class="album py-5 bg-light">
+        <div class="container">
+            <div class="dropdown">
+              <button class="btn btn-primary dropdown-toggle" type="button" id="filterStateButton" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                Filtrar por estado
+              </button>
+              <div class="dropdown-menu" id="filterState">
+              </div>
+            </div>
+            <hr/>
+            <table id="example" class="display" style="width:100%">
+                    <thead>
+                        <tr>
+                            <th>Usuario</th>
+                            <th>e-mail</th>
+                            <th>Fecha</th>
+                            <th>Estado</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tfoot>
+                        <tr>
+                            <th>Usuario</th>
+                            <th>e-mail</th>
+                            <th>Fecha</th>
+                            <th>Estado</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </tfoot>
+                </table>
+        </div>
+   </div>
+</main>
+{% endblock %}
+
+
+{% block styles -%}
+    {{super()}}
+    <link rel="stylesheet" type="text/css"
+          href="{{url_for('static', filename='jquery.dataTables.min.css')}}">
+    <link rel="stylesheet" type="text/css"
+          href="{{url_for('static', filename='buttons.dataTables.min.css')}}">
+{% endblock %}
+
+{% block scripts %}
+{{super()}}
+
+<script src="{{url_for('static', filename='jquery.dataTables.min.js')}}"></script>
+<script src="{{url_for('static', filename='dataTables.bootstrap4.min.js')}}"></script>
+<script src="{{url_for('static', filename='dataTables.buttons.min.js')}}"></script>
+<script src="{{url_for('static', filename='buttons.html5.min.js')}}"></script>
+
+
+<script language="JavaScript">
+$(document).ready(function() {
+    var desc = (function () {
+        var json = null;
+        $.ajax({
+            'async': false,
+            'global': false,
+            'url': "/endpoint_descriptions",
+            'dataType': "json",
+            'success': function (data) {
+                json = data;
+            }
+        });
+        return json;
+    })();
+    $('#example').DataTable( {
+        "ajax": '/admin/users_data', // (nuid, email, timestamp, state, uid))
+        "columnDefs": [
+            { "targets": 3,
+              "render": function(data, type, row, meta){
+                return '<span class="dottedUnderline" type=data-toggle="tooltip" data-placement="auto" title="'+ (desc[data] || 'Sin descripción')  + '">'+ data + '</span>';
+             },
+            },
+            { "targets": 4,
+              "render": function(data, type, row, meta){
+                return '<a href="/admin/history/' + data + '">ver</a>';
+             },
+            },
+        ],
+        dom: 'Bfrtip',
+        "buttons": [
+            'pageLength', 'copy', 'csv',
+        ],
+        initComplete: function () {
+            this.api().column(-2).every( function () {
+                var column = this;
+                var main = $("#filterState");
+                var item = $( '<button class="dropdown-item" type="button">Todos</button>' );
+                item.on( 'click', function () {
+                    var val = '';
+                    $(filterStateButton).text("Filtrar por estado");
+                    column
+                        .search( val ? '^'+val+'$' : '', true, false )
+                        .draw();
+                } );
+                main.append(item);
+                main.append($ ('<div class="dropdown-divider"></div>') )
+                column.data().unique().sort().each( function ( d, j ) {
+                    var item = $( '<button class="dropdown-item" type="button" value="' + d + '">' + d + '</button>' );
+                    item.on( 'click', function () {
+                        var val = $.fn.dataTable.util.escapeRegex(
+                            $(this).attr('value')
+                        );
+                        $(filterStateButton).text('Estado: ' + val);
+                        column
+                            .search( val ? '^'+val+'$' : '', true, false )
+                            .draw();
+                    } );
+                    main.append(item);
+                } );
+            } );
+        }
+    } );
+    $(function () {
+        $('[data-toggle="tooltip"]').tooltip();
+    })
+} );
+</script>
+
+{% endblock %}
+

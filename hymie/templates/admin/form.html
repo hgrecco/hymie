@@ -1,0 +1,24 @@
+{%- extends "/admin/base.html" %}
+
+{% import "bootstrap/wtf.html" as wtf %}
+
+{% block inner_content %}
+    {{ super() }}
+<main role="main">
+   <div class="album py-5 bg-light">
+        <div class="container">
+
+        <table>
+        {% for k, v in form.items() %}
+            <tr>
+                <td>{{ k }}</td>
+                <td>{% if v and v.startswith('http') %}{{ v | urlize(60, target='_blank') }}{% else %}{{ v }}{% endif %}</td>
+            </tr>
+        {% endfor %}
+        </table>
+        </div>
+   </div>
+</main>
+{% endblock %}
+
+

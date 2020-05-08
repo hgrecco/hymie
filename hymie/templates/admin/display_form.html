@@ -1,0 +1,60 @@
+{%- extends "/admin/base.html" %}
+
+{% import "bootstrap/wtf.html" as wtf %}
+
+{% block inner_content %}
+<main role="main">
+   <div class="album py-5 bg-light">
+        <div class="container">
+            <div class="row">
+                <div class="container alert alert-info">
+                    <p><b>Usuario: </b>
+                        {% if friendly_user_id %} {{ friendly_user_id }} ({% endif %}
+                        <a href="mailto:{{ user_email }}" class="alert-link">{{ user_email }}</a>
+                    {% if friendly_user_id %} ) {% endif %}
+                    </p>
+                    <p><b>formulario:</b> {{ endpoint }}</p>
+                    <p><b>fecha:</b> {{ timestamp }}</p>
+                </div>
+            </div>
+            <hr>
+            <div class="row">
+                <div class="container">
+                        {% block innerform %}
+                        {% endblock %}
+                </div>
+            </div>
+            {% if action_zone and admin_links %}
+            <hr/>
+            <div class="row">
+                <div class="container text-center">
+                        {% for link in admin_links %}
+                            <a role="button" class="btn hymie-button-{{ link.type }}" href="{{ view_link_for(link.endpoint) }}"  data-toggle="tooltip" data-placement="top" title="{{link.tooltip}}">{{ link.text }}</a>
+                        {% endfor %}
+                </div>
+            </div>
+            <hr/>
+            {% endif %}
+        </div>
+   </div>
+</main>
+{% endblock %}
+
+
+{% block scripts %}
+{{super()}}
+
+<script src="{{url_for('static', filename='jquery.dataTables.min.js')}}"></script>
+<script src="{{url_for('static', filename='dataTables.bootstrap4.min.js')}}"></script>
+<script language="JavaScript">
+$(document).ready(function() {
+    $(function () {
+        $('[data-toggle="tooltip"]').tooltip();
+        $(".hymie-button-accept").addClass("btn-success");
+        $(".hymie-button-reject").addClass("btn-danger");
+        $(".hymie-button-info").addClass("btn-info");
+    })
+} );
+</script>
+
+{% endblock %}
