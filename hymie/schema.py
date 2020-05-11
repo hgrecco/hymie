@@ -60,17 +60,25 @@ class Config(DataStruct):
     storage: Storage
 
 
-class ActionEmailForm(DataStruct):
+class Action(DataStruct):
+    condition: str = "True"
+
+
+class ActionBaseEmail(Action):
     destination: SpecialEmail
     cc: Optional[SpecialEmail] = None
     bcc: Optional[SpecialEmail] = None
 
 
-class ActionEmail(ActionEmailForm):
+class ActionEmailForm(ActionBaseEmail):
+    pass
+
+
+class ActionEmail(ActionBaseEmail):
     template: str
 
 
-class Actions(KeyDefinedValue):
+class AnyAction(KeyDefinedValue):
     content = {
         "email_form": ActionEmailForm,
         "email": ActionEmail,
@@ -88,7 +96,7 @@ class Endpoint(DataStruct):
     description: str
     form_action: validators.value_in(None, "store", "show") = None
     form_prefill: Optional[Dict] = None
-    actions: List[Actions] = []
+    actions: List[AnyAction] = []
     next_state: Optional[str] = None
     admin_links: List[Link] = []
 
