@@ -161,7 +161,10 @@ def create_app(path, app=None):
         if isinstance(tmpl, str):
             return render_template(tmpl, **kw)
 
-        return tmpl.render(**kw)
+        return tmpl.render(**kw).strip()
+
+    def app_string_render_template(s, **kwargs):
+        return app_render_template(common.BASE_JINJA_ENV.from_string(s), **kwargs)
 
     ####################
     # Common Endpoints
@@ -391,7 +394,7 @@ def create_app(path, app=None):
         ep = hobj.endpoints[endpoint_name]
         form_action = ep.form_action
 
-        json_form = None
+        json_form = {}
         if form_action is None:
             # if there is not form action we store the current endpoint as new state
             # just to reference the transition
@@ -450,18 +453,35 @@ def create_app(path, app=None):
         with storage.maybe_store_state(uid, ep.next_state) as hcsf:
 
             for action in ep.actions:
+                if isinstance(action, schema.Action):
 
-                # action(app: FlaskForm, hobj: Hymie, uid: str, endpoint: str, form: dict, action_options: ?):
-                if isinstance(action, schema.ActionEmail):
-                    hobj.action_email(
-                        APP, uid, endpoint_name, json_form, action, hcsf=hcsf
-                    )
+                    # AFAIK there is no **safe** way to evaluate that contains user provided values
+                    # a boolean expression in python without a parser.
+                    # As jinja already has a parser that is used everywhere, we reuse it here.
+                    if (
+                        app_string_render_template(action.condition, form=json_form)
+                        != "True"
+                    ):
+                        continue
 
-                elif isinstance(action, schema.ActionEmailForm):
-                    hobj.action_email_form(APP, uid, endpoint_name, json_form, action)
+                    # action(app: FlaskForm, hobj: Hymie, uid: str, endpoint: str, form: dict, action_options: ?):
+                    if isinstance(action, schema.ActionEmail):
+                        hobj.action_email(
+                            APP, uid, endpoint_name, json_form, action, hcsf=hcsf
+                        )
 
+                    elif isinstance(action, schema.ActionEmailForm):
+                        hobj.action_email_form(
+                            APP, uid, endpoint_name, json_form, action
+                        )
+
+                    else:
+                        raise Exception(
+                            "Action not defined for type %s" % action.__class__
+                        )
                 else:
-                    raise Exception("Action not defined for type %s" % action.__class__)
+
+                    logger.error("Action is not a subclass of Action: %s " % action)
 
         try:
             meta, tmpl = hobj.get_page(endpoint_name, APP)
