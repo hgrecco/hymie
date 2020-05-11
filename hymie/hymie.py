@@ -419,11 +419,31 @@ class Hymie:
     # These functions are used to test the hymie app for posible logic errors
     # before it is served.
 
+    def check_prefixed_variable(self, app, name, variable, known_links):
+        if variable.startswith("form."):
+            return self.check_variable(app, name + "." + variable[len("form.") :])
+        elif variable.startswith("previous."):
+            return self.check_variable(app, variable[len("previous.") :])
+        elif variable not in known_links:
+            return self.check_variable(app, variable)
+        else:
+            return True
+
+    def integrity_action_base(self, name, app, action):
+        errs = []
+        for variable in extract_jinja2_variables(action.condition):
+            msg = self.check_prefixed_variable(app, name, variable, ())
+
+            if msg is not True:
+                errs.append(f"In {name}, the condition {action.condition} {msg}")
+
+        return errs
+
     def integrity_email_form(self, name, app, action):
-        return ()
+        return self.integrity_action_base(name, app, action)
 
     def integrity_email(self, name, app, action):
-        errs = []
+        errs = self.integrity_action_base(name, app, action)
         template = action.template
         try:
             email_meta, email_tmpl, email_variables = self.get_email(template)
@@ -457,14 +477,7 @@ class Hymie:
         # Check that all the form and previous fields exist.
         for variable in tuple(email_variables):
 
-            if variable.startswith("form."):
-                msg = self.check_variable(app, name + "." + variable[len("form.") :])
-            elif variable.startswith("previous."):
-                msg = self.check_variable(app, variable[len("previous.") :])
-            elif variable not in known_links:
-                msg = self.check_variable(app, variable)
-            else:
-                msg = True
+            msg = self.check_prefixed_variable(app, name, variable, known_links)
 
             if msg is not True:
                 errs.append(f"In {name}, the template {template} {msg}")
