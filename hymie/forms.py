@@ -169,7 +169,10 @@ def generate_read_only_form_cls(name, fields):
             field = {**field, "type": "LinkField"}
         elif field["type"] == "SelectField":
             field = {**field, "type": "StringField"}
-            ""
+        elif field["type"] == "TimeField":
+            field = {**field, "type": "StringField"}
+        elif field["type"] == "DateField":
+            field = {**field, "type": "StringField"}
         field = generate_field(label, field)
         field.kwargs["render_kw"] = dict(readonly=True)
         setattr(cls, label, field)
