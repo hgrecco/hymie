@@ -8,7 +8,7 @@ for p in path.iterdir():
     if p.stem == "uploads":
         continue
     for f in p.iterdir():
-
+        print(f)
         if not f.is_symlink():
             continue
 
