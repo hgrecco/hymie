@@ -50,7 +50,7 @@ def view_link_for(storage, uid, endpoint_name):
     )
 
 
-def create_app(path, app=None):
+def create_app(path, app=None, production=False):
     """Create or modify a Flask App.
 
     Parameters
@@ -81,7 +81,7 @@ def create_app(path, app=None):
     APP.config["FLASK_AUTH_REALM"] = "You are not an administrator yet!"
     htpasswd = HtPasswdAuth(APP)
 
-    hobj = Hymie(path)
+    hobj = Hymie(path, production)
 
     hobj.integrity_check(APP)
 

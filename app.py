@@ -9,4 +9,4 @@ except KeyError:
     sys.exit("HYMIE_APP_PATH environmental variable not set")
 
 # noqa: F401
-app = create_app(path)
+app = create_app(path, production=bool(os.environ.get("HYMIE_PRODUCTION", False)))

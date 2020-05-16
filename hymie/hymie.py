@@ -50,22 +50,36 @@ class Hymie:
         folder for the Hymie app.
     """
 
-    def __init__(self, path):
+    def __init__(self, path, production=False):
         logger.info(f"Starting Hymie app in {path}")
         self.path = pathlib.Path(path)
 
-        filename = self.path.joinpath("hymie.yaml")
+        hymie_yaml = self.path.joinpath("hymie.yaml")
+        secrets_yaml = self.path.joinpath("secrets.yaml")
+        if production:
+            extra_yaml = self.path.joinpath("production.yaml")
+        else:
+            extra_yaml = self.path.joinpath("testing.yaml")
 
-        content: schema.Root = schema.Root.from_filename(str(filename))
+        files = [str(f) for f in (extra_yaml, secrets_yaml, hymie_yaml) if f.exists()]
+        mtime = max(
+            [
+                f.stat().st_mtime
+                for f in (extra_yaml, secrets_yaml, hymie_yaml)
+                if f.exists()
+            ]
+        )
 
-        logger.info(f"Loaded app definition from {filename}")
+        logger.info(f"Loaded app definition from {files}")
+
+        content: schema.Root = schema.Root.from_filenames(files)
+
+        logger.info(f"Loaded app")
 
         #: Describes
         self.metadata = content.metadata
         self.config = cfg = content.config
         self.endpoints = content.endpoints
-
-        mtime = filename.stat().st_mtime
 
         # This dictionary is injected when rendering every template.
         self.template_vars = dict(
@@ -507,7 +521,13 @@ class Hymie:
         if form_variable in self.template_vars:
             return True
 
-        form_name, attr_name = form_variable.split(".")
+        if form_variable in self.endpoints:
+            return True
+
+        try:
+            form_name, attr_name = form_variable.split(".")
+        except Exception:
+            raise Exception(f"Could not split {form_variable}")
 
         try:
             _, _, pwtform = self.get_form(form_name, app)
@@ -580,6 +600,12 @@ class Hymie:
             except Exception as e:
                 warns.append(f"In {name}, could not get page: {e}")
 
+            for cne in ep.conditional_next_state:
+                errs.extend(self.check_str_template(app, cne.condition, name))
+                if cne.next_state not in self.endpoints:
+                    errs.append(
+                        f"In {name}, conditional next_state points to an unknown endpoint: {cne.next_state}"
+                    )
             next_state = ep.next_state
             if next_state and next_state not in self.endpoints:
                 errs.append(
