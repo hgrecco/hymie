@@ -9,7 +9,7 @@
 """
 
 
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 from datastruct import DataStruct, validators
 from datastruct.ds import KeyDefinedValue
@@ -29,7 +29,7 @@ class Metadata(DataStruct):
     maintainer: str
     maintainer_email: validators.Email
     first_endpoint: str
-    friendly_user_id: Optional[str] = ""
+    friendly_user_id: str = ""
 
 
 class Email(DataStruct):
@@ -66,8 +66,8 @@ class Action(DataStruct):
 
 class ActionBaseEmail(Action):
     destination: SpecialEmail
-    cc: Optional[SpecialEmail] = None
-    bcc: Optional[SpecialEmail] = None
+    cc: SpecialEmail = None
+    bcc: SpecialEmail = None
 
 
 class ActionEmailForm(ActionBaseEmail):
@@ -92,13 +92,19 @@ class Link(DataStruct):
     tooltip: str = ""
 
 
+class ConditionalNextState(DataStruct):
+    condition: str
+    next_state: str
+
+
 class Endpoint(DataStruct):
     description: str
     form_action: validators.value_in(None, "store", "show") = None
-    form_prefill: Optional[Dict] = None
+    form_prefill: dict = {}
     actions: List[AnyAction] = []
-    next_state: Optional[str] = None
+    next_state: str = ""
     admin_links: List[Link] = []
+    conditional_next_state: List[ConditionalNextState] = []
 
 
 class Root(DataStruct):
