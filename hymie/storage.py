@@ -157,6 +157,15 @@ class Storage:
         self.path.mkdir(parents=True, exist_ok=True)
         self.upload_path.mkdir(parents=True, exist_ok=True)
 
+        salt_file = self.path.joinpath("salt.txt")
+        if salt_file.exists():
+            if salt_file.read_text(encoding="utf-8") != salt:
+                raise Exception(
+                    "The salt value for the current storage does not match the provided value."
+                )
+        else:
+            salt_file.write_text(salt, encoding="utf-8")
+
         # We create an empty file just to see that we have write privileges
         # to these folders
         self.path.joinpath("ok").touch(exist_ok=True)
