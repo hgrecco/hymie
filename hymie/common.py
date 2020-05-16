@@ -14,7 +14,7 @@ import re
 
 from flask import flash
 from flask_wtf import FlaskForm
-from jinja2 import BaseLoader, Environment
+from jinja2 import BaseLoader, Environment, nodes
 from wtforms import StringField, SubmitField
 from wtforms import validators as v
 
@@ -27,10 +27,19 @@ BASE_JINJA_ENV = Environment(loader=BaseLoader())
 JINJA2_VAR_MATCHER = re.compile(r"{{([ \ta-zA-Z_][ \ta-zA-Z0-9_.|]*)}}")
 
 
+def recurse_ga(node):
+    if isinstance(node, nodes.Name):
+        return (node.name,)
+    elif isinstance(node, nodes.Getattr):
+        return (node.attr,) + recurse_ga(node.node)
+    else:
+        raise Exception
+
+
 def extract_jinja2_variables(html):
     """Extrat jinja2 variables (such as {{ name }}) from an html.
 
-    Might include modifiers. e.g. '{{ name | upper }}' -> 'name | upper'
+    Includes attributes.
 
     Parameters
     ----------
@@ -39,9 +48,17 @@ def extract_jinja2_variables(html):
     Returns
     -------
     tuple
-        Content of the
     """
-    return tuple(s.split("|", 1)[0].strip() for s in JINJA2_VAR_MATCHER.findall(html))
+    found = set()
+    ast = BASE_JINJA_ENV.parse(html)
+
+    for node in ast.find_all(nodes.Name):
+        found.add(node.name)
+
+    for node in ast.find_all(nodes.Getattr):
+        found.add(".".join(reversed(recurse_ga(node))))
+
+    return found
 
 
 def flash_errors(form):
