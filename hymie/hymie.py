@@ -202,8 +202,8 @@ class Hymie:
 
         Returns
         -------
-        dict, jinja2.Template, WTForm
-            form attributes, form as jinja2 template, form object
+        dict, jinja2.Template, WTForm, set
+            form attributes, form as jinja2 template, form object, jinja2 variables
         """
 
         mdfile = self.path.joinpath("forms", name).with_suffix(".md")
@@ -224,10 +224,21 @@ class Hymie:
         tmpl += "{% block innerform %}"
         tmpl += html
         tmpl += "{% endblock %})"
-        if app:
-            return md.Meta, app.jinja_env.from_string(tmpl), wtform
 
-        return md.Meta, BASE_JINJA_ENV.from_string(tmpl), wtform
+        if app:
+            return (
+                md.Meta,
+                app.jinja_env.from_string(tmpl),
+                wtform,
+                extract_jinja2_variables(html),
+            )
+
+        return (
+            md.Meta,
+            BASE_JINJA_ENV.from_string(tmpl),
+            wtform,
+            extract_jinja2_variables(html),
+        )
 
     @functools.lru_cache(maxsize=64)
     def get_page(self, name, app, extends="simple.html"):
@@ -268,9 +279,13 @@ class Hymie:
         )
 
         if app:
-            return md.Meta, app.jinja_env.from_string(tmpl)
+            return (
+                md.Meta,
+                app.jinja_env.from_string(tmpl),
+                extract_jinja2_variables(html),
+            )
 
-        return md.Meta, BASE_JINJA_ENV.from_string(tmpl)
+        return md.Meta, BASE_JINJA_ENV.from_string(tmpl), extract_jinja2_variables(html)
 
     def convert_email(self, email, uid):
         """Convert e-mail field to e-mail address.
@@ -404,6 +419,7 @@ class Hymie:
         kwargs["previous"] = self.storage.user_retrieve_all_current(
             uid, skip=[endpoint]
         )
+        kwargs["previous"][endpoint] = json_form
         kwargs["link"] = url_for("view", uid=uid, _external=True)
 
         # build links
@@ -515,6 +531,9 @@ class Hymie:
 
     def check_variable(self, app, form_variable):
 
+        if form_variable.startswith("wtf"):
+            return True
+
         if form_variable in ("link", "form", "previous", "user_email"):
             return True
 
@@ -530,7 +549,7 @@ class Hymie:
             raise Exception(f"Could not split {form_variable}")
 
         try:
-            _, _, pwtform = self.get_form(form_name, app)
+            _, _, pwtform, _ = self.get_form(form_name, app)
         except FileNotFoundError:
             return f"refers to an unavailable form: {form_name}"
         except Exception as e:
@@ -567,7 +586,14 @@ class Hymie:
 
             if ep.form_action:
                 try:
-                    self.get_form(name, app)
+                    _, tmpl, _, tmpl_vars = self.get_form(name, app)
+                    tmp = (
+                        self.check_prefixed_variable(app, name, tmpl_var, ())
+                        for tmpl_var in tmpl_vars
+                    )
+                    errs.extend(
+                        f"In {name}, the form " + s for s in tmp if s is not True
+                    )
                 except FileNotFoundError:
                     errs.append(f"In {name}, form file not found")
                 except Exception as e:
@@ -594,7 +620,12 @@ class Hymie:
                     )
 
             try:
-                self.get_page(name, app)
+                _, tmpl, tmpl_vars = self.get_page(name, app)
+                tmp = (
+                    self.check_prefixed_variable(app, name, tmpl_var, ())
+                    for tmpl_var in tmpl_vars
+                )
+                errs.extend(f"In {name}, the form " + s for s in tmp if s is not True)
             except FileNotFoundError:
                 errs.append(f"In {name}, page file not found")
             except Exception as e:

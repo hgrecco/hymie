@@ -196,7 +196,7 @@ def create_app(path, app=None, production=False):
     def index():
         """Welcome page.
         """
-        meta, tmpl = hobj.get_page("start", APP)
+        _, tmpl, _ = hobj.get_page("start", APP)
         return app_render_template(
             tmpl,
             link_register=url_for("register", _external=True),
@@ -415,7 +415,7 @@ def create_app(path, app=None, production=False):
 
         else:
 
-            meta, tmpl, form_cls = hobj.get_form(endpoint_name, APP)
+            meta, tmpl, form_cls, tmpl_vars = hobj.get_form(endpoint_name, APP)
 
             prefill = dict(ep.form_prefill or {})
             form_data = form_data or {}
@@ -449,10 +449,18 @@ def create_app(path, app=None, production=False):
                     endpoint_name = v[0].strip()
                     kwargs[k] = view_link_for(storage, uid, endpoint_name)
 
+                previous = hobj.storage.user_retrieve_current(
+                    uid,
+                    tuple(
+                        v.split(".")[1] for v in tmpl_vars if v.startswith("previous.")
+                    ),
+                )
+
                 return app_render_template(
                     tmpl,
                     user_email=storage.user_retrieve_email(uid),
                     form=form,
+                    previous=previous,
                     **kwargs,
                 )
 
@@ -494,7 +502,7 @@ def create_app(path, app=None, production=False):
                     logger.error("Action is not a subclass of Action: %s " % action)
 
         try:
-            meta, tmpl = hobj.get_page(endpoint_name, APP)
+            meta, tmpl, _ = hobj.get_page(endpoint_name, APP)
             return app_render_template(tmpl)
         except FileNotFoundError:
             return app_render_template("message.html", message="Hecho")
@@ -625,7 +633,7 @@ def create_app(path, app=None, production=False):
             content = hobj.storage.user_retrieve(uid, dated_endpoint)
 
         try:
-            meta, tmpl, form_cls = hobj.get_form(
+            meta, tmpl, form_cls, tmpl_vars = hobj.get_form(
                 plain_endpoint, APP, read_only=True, extends="/admin/display_form.html"
             )
             form = form_cls(**content)

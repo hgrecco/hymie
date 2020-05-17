@@ -381,6 +381,33 @@ class Storage:
         file = self.path.joinpath(uid, endpoint).with_suffix(".json")
         return _retrieve(file)
 
+    def user_retrieve_current(self, uid, endpoints):
+        """Retrieve the content of all non-system endpoints at the most recent dates.
+
+        Parameters
+        ----------
+        uid : str
+        endpoints : tuple
+            endpoints to retrieve
+
+        Returns
+        -------
+        dict
+            endpoint -> content
+        """
+        out = {}
+        for p in self.path.joinpath(uid).iterdir():
+            if p.is_dir():
+                continue
+            if not p.is_symlink():
+                continue
+            endpoint = p.stem
+            if endpoint not in endpoints:
+                continue
+
+            out[endpoint] = _retrieve(p)
+        return out
+
     def user_retrieve_all_current(self, uid, skip=()):
         """Retrieve the content of all non-system endpoints at the most recent dates.
 

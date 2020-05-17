@@ -61,6 +61,20 @@ def extract_jinja2_variables(html):
     return found
 
 
+def extract_jinja2_var_comparison(html):
+    ast = BASE_JINJA_ENV.parse(html)
+
+    comparisons = []
+    for node in ast.find_all(nodes.Compare):
+        lhs = extract_jinja2_variables(node.expr)
+        rhs = extract_jinja2_variables(node.ops)
+        if not (rhs + lhs):
+            continue
+        comparisons = (rhs, node.ops[0].op, lhs)
+
+    return comparisons
+
+
 def flash_errors(form):
     """Flashes form errors
     """
