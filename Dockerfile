@@ -26,7 +26,9 @@ RUN pip install -r requirements.txt
 RUN pip install uwsgi psycopg2-binary
 
 # We copy the rest of the codebase into the image
-COPY . .
+# COPY . .
+ADD hymie.tar.gz .
+ADD hymie-app-tesisdf.tar.gz happ/
 
 # Finally, we run uWSGI with the ini file we
 # created earlier
