@@ -14,9 +14,10 @@ import flask
 import flask_bootstrap
 from flask import Markup, flash, jsonify, render_template, send_from_directory, url_for
 from flask_bootstrap import Bootstrap
-from flask_htpasswd import HtPasswdAuth
+from flask_httpauth import HTTPBasicAuth
 from flask_wtf import CSRFProtect
 from werkzeug.exceptions import RequestEntityTooLarge
+from werkzeug.security import check_password_hash, generate_password_hash
 
 from . import common, schema, storage
 from .common import logger
@@ -79,13 +80,22 @@ def create_app(path, app=None, production=False):
 
     APP.config["FLASK_HTPASSWD_PATH"] = str(Path(path).joinpath(".htpasswd"))
     APP.config["FLASK_AUTH_REALM"] = "You are not an administrator yet!"
-    htpasswd = HtPasswdAuth(APP)
+    auth = HTTPBasicAuth()
 
     hobj = Hymie(path, production)
 
     hobj.integrity_check(APP)
 
     hobj.connect_to_app(APP)
+
+    USERS = {
+        "admin": generate_password_hash(hobj.config.secret.admin_password),
+    }
+
+    @auth.verify_password
+    def verify_password(username, password):
+        if username in USERS and check_password_hash(USERS.get(username), password):
+            return username
 
     # try:
     #     import atexit
@@ -494,8 +504,8 @@ def create_app(path, app=None, production=False):
     ####################
 
     @APP.route("/admin")
-    @htpasswd.required
-    def admin(user):
+    @auth.login_required
+    def admin():
         """Entry point for the administrator interface.
 
         Parameters
@@ -510,8 +520,8 @@ def create_app(path, app=None, production=False):
         )
 
     @APP.route("/admin/users")
-    @htpasswd.required
-    def users(user):
+    @auth.login_required
+    def users():
         """Display the list of users.
 
         Parameters
@@ -529,8 +539,8 @@ def create_app(path, app=None, production=False):
         )
 
     @APP.route("/admin/users_data")
-    @htpasswd.required
-    def users_data(user):
+    @auth.login_required
+    def users_data():
         """json list of users.
 
         Parameters
@@ -557,8 +567,8 @@ def create_app(path, app=None, production=False):
 
     @APP.route("/admin/history/<uid>")
     @APP.route("/admin/history/<uid>/<plain_endpoint>/<timestamp>")
-    @htpasswd.required
-    def history(user, uid, plain_endpoint=None, timestamp=None):
+    @auth.login_required
+    def history(uid, plain_endpoint=None, timestamp=None):
         """Display the history for a given user.
 
         The endpoint and timestamp can be also provided.
@@ -650,8 +660,8 @@ def create_app(path, app=None, production=False):
         )
 
     @APP.route("/admin/history_data/<uid>")
-    @htpasswd.required
-    def history_data(user, uid):
+    @auth.login_required
+    def history_data(uid):
         """json state history for a given uid.
 
         Parameters

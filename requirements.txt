@@ -11,6 +11,6 @@ wtforms_components
 serialize
 datastruct
 uwsgidecorators
-flask-htpasswd
+flask-httpauth
 arrow
 email_validator
