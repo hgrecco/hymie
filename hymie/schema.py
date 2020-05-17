@@ -47,6 +47,7 @@ class Email(DataStruct):
 
 class Secret(DataStruct):
     key: str
+    admin_password: str
 
 
 class Storage(DataStruct):
