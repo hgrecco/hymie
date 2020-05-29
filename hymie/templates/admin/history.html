@@ -12,7 +12,7 @@
                     <p><b>Usuario: </b>
                         {% if friendly_user_id %} {{ friendly_user_id }} ({% endif %}
                         <a href="mailto:{{ user_email }}" class="alert-link">{{ user_email }}</a>
-                    {% if friendly_user_id %} ) {% endif %}
+                        {% if friendly_user_id %} ) {% endif %}
                     </p>
                 </div>
             </div>
@@ -22,11 +22,11 @@
                     <span class="dottedUnderline hymie-state" type=data-toggle="tooltip" data-placement="auto" title="">{{ state }}</span>
                     </p>
                     <p><b>desde:</b> {{ timestamp }}</p>
-                    {% if action_zone and admin_links %}
+                    {% if action_zone and admin_forms %}
                     <div class="row">
                         <div class="container text-center">
-                                {% for link in admin_links %}
-                                    <a role="button" class="btn hymie-button-{{ link.type }}" href="{{ view_link_for(link.endpoint) }}"  data-toggle="tooltip" data-placement="top" title="{{link.tooltip}}">{{ link.text }}</a>
+                                {% for link in admin_forms %}
+                                    <a role="button" class="btn hymie-button-{{ link.button_type }}" href="{{ view_admin_link_for(loop.index0) }}"  data-toggle="tooltip" data-placement="top" title="{{link.button_tooltip}}">{{ link.button_text }}</a>
                                 {% endfor %}
                         </div>
                     </div>
@@ -39,14 +39,14 @@
             <tr>
                 <th>Dia y hora</th>
                 <th>Estado</th>
-                <th>Acciones</th>
+                <th>Formulario</th>
             </tr>
         </thead>
         <tfoot>
             <tr>
                 <th>Dia y hora</th>
                 <th>Formulario</th>
-                <th>Acciones</th>
+                <th>Formulario</th>
             </tr>
         </tfoot>
     </table>
@@ -97,7 +97,11 @@ $(document).ready(function() {
             },
             { "targets": -1,
               "render": function(data, type, row, meta){
-                return '<a href="/admin/history/{{uid}}/' + data[0] + '/' + data[1] + '">ver</a>';
+                if (data !== null) {
+                    return '<a href="/admin/history/{{uid}}/' + data[0] + '/' + data[1] + '">ver</a>';
+                } else {
+                    return '';
+                }
              },
             },
         ],

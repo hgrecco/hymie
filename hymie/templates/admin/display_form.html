@@ -24,13 +24,13 @@
                         {% endblock %}
                 </div>
             </div>
-            {% if action_zone and admin_links %}
+            {% if action_zone and admin_forms %}
             <hr/>
             <div class="row">
                 <div class="container text-center">
-                        {% for link in admin_links %}
-                            <a role="button" class="btn hymie-button-{{ link.type }}" href="{{ view_link_for(link.endpoint) }}"  data-toggle="tooltip" data-placement="top" title="{{link.tooltip}}">{{ link.text }}</a>
-                        {% endfor %}
+                    {% for link in admin_forms %}
+                        <a role="button" class="btn hymie-button-{{ link.button_type }}" href="{{ view_admin_link_for(loop.index0) }}"  data-toggle="tooltip" data-placement="top" title="{{link.button_tooltip}}">{{ link.button_text }}</a>
+                    {% endfor %}
                 </div>
             </div>
             <hr/>

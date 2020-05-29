@@ -13,6 +13,8 @@ import functools
 import hashlib
 import json
 import pathlib
+from dataclasses import dataclass
+from typing import Tuple
 
 import arrow
 from flask import url_for
@@ -115,6 +117,37 @@ def _store(json_file, data):
     """
     with json_file.open("w", encoding="utf-8") as fo:
         json.dump(data, fo)
+
+
+# {"state": "plan_en_evaluacion", "origin": ["plan_pendiente", "20200527_094911"], "form_dated_file": ["plan", "20200527_095607"]}
+@dataclass
+class State:
+    """State
+    """
+
+    state: str
+
+    #: current timestamp
+    timestamp: str
+
+    #: previous state and timestamp
+    origin_dated_tuple: Tuple[str, str]
+
+    #: previous
+    form_dated_tuple: Tuple[str, str]
+
+    @classmethod
+    def from_hymie_dict(cls, d):
+        if d["form_dated_tuple"]:
+            fdt = tuple(d["form_dated_tuple"])
+        else:
+            fdt = None
+        return cls(
+            state=d["state"],
+            timestamp=d["_hymie_timestamp"],
+            origin_dated_tuple=tuple(d["origin"]),
+            form_dated_tuple=fdt,
+        )
 
 
 class Storage:
@@ -261,53 +294,14 @@ class Storage:
 
         Returns
         -------
-        str
+        State
         """
-        return self.user_retrieve(uid, "_state")["state"]
 
-    def user_retrieve_state_timestamp(self, uid):
-        """Retrieve the current state and timestamp.
+        return State.from_hymie_dict(self.user_retrieve(uid, "_state"))
 
-        Parameters
-        ----------
-        uid : str
-
-        Returns
-        -------
-        str, str
-            state and timestamp
-        """
-        content = self.user_retrieve(uid, "_state")
-        return content["state"], content["_hymie_timestamp"]
-
-    def user_retrieve_state_timestamp_origin(self, uid):
-        """Retrieve the current state and timestamp.
-
-        Parameters
-        ----------
-        uid : str
-
-        Returns
-        -------
-        str, str
-            state and timestamp
-        """
-        content = self.user_retrieve(uid, "_state")
-        try:
-            origin = content["origin"]
-        except KeyError:
-            # This path is only here to support previous hymie deployment
-            # in which origin was not stored.
-            history = self.user_retrieve_state_history(uid)
-            tss = sorted(history.keys())
-            ndx = tss.index(content["_hymie_timestamp"])
-            origin = history[tss[ndx - 1]], tss[ndx]
-
-        return content["state"], content["_hymie_timestamp"], origin
-
-    def user_store(self, uid, endpoint, data, make_link=True):
+    def user_store(self, uid, endpoint, data, make_link_file=True):
         """Store data for a given user.
-
+`
         Parameters
         ----------
         uid : str or pathlib.Path
@@ -315,8 +309,8 @@ class Storage:
             plain endpoint name
         data : dict
             content to store
-        make_link : bool
-            if True, a link file will be created
+        make_link_file : bool
+            if True, a link file will be created.
 
         Returns
         -------
@@ -336,7 +330,7 @@ class Storage:
 
         link_file = folder.joinpath(endpoint).with_suffix(".json")
 
-        if make_link:
+        if make_link_file:
             if link_file.exists():
                 link_file.unlink()
 
@@ -344,13 +338,15 @@ class Storage:
 
         return link_file, dated_file
 
-    def user_store_state(self, uid, state):
+    def user_store_state(self, uid, state, make_link_file=True, form_dated_tuple=None):
         """Store a new state for given user.
 
         Parameters
         ----------
         uid : str
         state : str
+        make_link_file : bool
+            if True,
 
         Returns
         -------
@@ -358,11 +354,17 @@ class Storage:
             link file and dated file
         """
         try:
-            origin = self.user_retrieve_state_timestamp(uid)
+            current_state = self.user_retrieve_state(uid)
+            origin = current_state.state, current_state.timestamp
         except FileNotFoundError:
-            origin = "register", datetime_to_timestamp()
+            origin = "register", datetime_to_timestamp(arrow.now().shift(minutes=-1))
 
-        return self.user_store(uid, "_state", dict(state=state, origin=origin))
+        return self.user_store(
+            uid,
+            "_state",
+            dict(state=state, origin=origin, form_dated_tuple=form_dated_tuple),
+            make_link_file=make_link_file,
+        )
 
     def user_retrieve(self, uid, endpoint):
         """Retrieve the endpoint content for a given user.
@@ -472,7 +474,8 @@ class Storage:
 
         Returns
         -------
-        dict
+        dict:
+            timestamp -> state, form_dated_file
         """
         out = {}
         for p in self.path.joinpath(uid).iterdir():
@@ -481,11 +484,12 @@ class Storage:
             if not p.stem.startswith("_state"):
                 continue
             content = self.user_retrieve(uid, p.stem)
-            out[content["_hymie_timestamp"]] = content["state"]
+            out[content["_hymie_timestamp"]] = State.from_hymie_dict(content)
+
         return out
 
     @contextlib.contextmanager
-    def maybe_store_state(self, uid, state):
+    def maybe_store_state(self, uid, state, store_form=None):
         """Context manager usesd to state a new state.
 
         Parameters
@@ -498,19 +502,49 @@ class Storage:
         -------
 
         """
-        if state is None:
-            yield self.statehash_for(uid)
+
+        if not state:
+            raise Exception("State should not be empty.")
+
         else:
-            last_file, dated_file = self.user_store(
-                uid, "_state", dict(state=state), False
-            )
 
-            yield self.hash_for(uid + dated_file.stem)
+            dated_file = None
+            form_link_file = None
+            form_dated_file = None
 
-            if last_file.exists():
-                last_file.unlink()
+            try:
+                if store_form:
+                    form_name, json_form = store_form
+                    form_link_file, form_dated_file = self.user_store(
+                        uid, form_name, json_form, make_link_file=False
+                    )
 
-            last_file.symlink_to(dated_file)
+                last_file, dated_file = self.user_store_state(
+                    uid,
+                    state,
+                    make_link_file=False,
+                    form_dated_tuple=split_endpoint_timestamp(form_dated_file),
+                )
+
+                yield self.hash_for(uid + dated_file.stem)
+
+                if last_file.exists():
+                    last_file.unlink()
+
+                if form_dated_file:
+                    if form_link_file.exists():
+                        form_link_file.unlink()
+
+                    form_link_file.symlink_to(form_dated_file)
+
+                last_file.symlink_to(dated_file)
+
+            except Exception:
+                if form_dated_file:
+                    form_dated_file.unlink()
+                if dated_file:
+                    dated_file.unlink()
+                raise
 
     ##############################
     # Methods to store form data
@@ -562,6 +596,7 @@ class Storage:
         dict
         """
         data = {}
+        # noinspection PyProtectedMember
         for name, field in form._fields.items():
             if name in ("csrf_token", "submit"):
                 continue

@@ -29,28 +29,6 @@ flask_bootstrap.BOOTSTRAP_VERSION = flask_bootstrap.get_bootstrap_version(
 )
 
 
-def view_link_for(storage, uid, endpoint_name):
-    """Create a link for an endpoint with predefined output.
-
-    Parameters
-    ----------
-    storage : storage.Storage
-    uid : str
-    endpoint_name : str
-
-    Returns
-    -------
-    str
-    """
-    return url_for(
-        "view",
-        uid=uid,
-        hcsf=storage.statehash_for(uid),
-        endpoint_name=endpoint_name,
-        _external=True,
-    )
-
-
 def create_app(path, app=None, production=False):
     """Create or modify a Flask App.
 
@@ -59,6 +37,8 @@ def create_app(path, app=None, production=False):
     path : str or Path
         The folder containing the `hymie.yaml` file.
     app : Flask App
+    production : bool
+        indicates if the testing or production yaml file is going to be used.
 
     Returns
     -------
@@ -173,6 +153,29 @@ def create_app(path, app=None, production=False):
 
         return tmpl.render(**kw).strip()
 
+    def app_render_template_previous(uid, tmpl, tmpl_vars, **kwargs):
+        """A wrapper for Flask template rendering that can either render a template
+        or load it by name and then render it.
+
+        It injects the app metadata and previous form valus for uid
+
+        Parameters
+        ----------
+        tmpl : str or Template
+        kwargs :
+            Additional values to inject for rendering
+
+        Returns
+        -------
+
+        """
+
+        previous = hobj.storage.user_retrieve_current(
+            uid, tuple(v.split(".")[1] for v in tmpl_vars if v.startswith("previous.")),
+        )
+
+        return app_render_template(tmpl, previous=previous, **kwargs)
+
     def app_string_render_template(s, **kwargs):
         return app_render_template(common.BASE_JINJA_ENV.from_string(s), **kwargs)
 
@@ -182,6 +185,7 @@ def create_app(path, app=None, production=False):
 
     @APP.errorhandler(413)
     def request_entity_too_large(error):
+        logger.error(error)
         return app_render_template("toobig.html")
         # flash('Los archivos adjuntos no pueden superar los 5MB cada uno.', 'danger')
         # try:
@@ -196,7 +200,7 @@ def create_app(path, app=None, production=False):
     def index():
         """Welcome page.
         """
-        _, tmpl, _ = hobj.get_page("start", APP)
+        _, tmpl, _ = hobj.get_page("start.md", APP)
         return app_render_template(
             tmpl,
             link_register=url_for("register", _external=True),
@@ -236,7 +240,7 @@ def create_app(path, app=None, production=False):
             return app_render_template("register.html", form=form)
 
         try:
-            storage.register(email, hobj.metadata.first_endpoint)
+            storage.register(email, hobj.metadata.first_state)
         except Exception as ex:
             logger.error("while trying to register an email address", ex)
             flash(common.MSG_ERROR_REGISTERING, "danger")
@@ -324,50 +328,71 @@ def create_app(path, app=None, production=False):
         return send_from_directory(directory=str(storage.upload_path), filename=fileid)
 
     @APP.route("/view/<uid>", methods=("GET", "POST"))
-    @APP.route("/view/<uid>/<hcsf>/<endpoint_name>", methods=("GET", "POST"))
-    def view(uid, hcsf=None, endpoint_name=None):
-        """Show a hymie endpoint (start).
+    @APP.route("/view/<uid>/<hcsf>/<state_name>", methods=("GET", "POST"))
+    def view(uid, hcsf=None, state_name=None):
+
+        # TODO: Deprecate this in favor of view_state or goto_state
+
+        if state_name is None:
+            return view_current_state(uid)
+
+        current_hcsf = hobj.storage.statehash_for(uid)
+        if current_hcsf != hcsf:
+            return app_render_template(
+                "message.html", message=common.MSG_INVALID_UID_HEP
+            )
+        return admin_view(uid, state_name)
+
+    @APP.route("/view_current_state/<uid>", methods=("GET", "POST"))
+    @APP.route("/view_current_state/<uid>/<int:form_number>", methods=("GET", "POST"))
+    def view_current_state(uid, form_number=None):
+        """Show the current form/page for a given user.
 
         There are two ways to access an endpoint
 
         ** Show form ** -> /view/<uid>
         - uid: user identifier
+        Displays a list of available forms or the first if only one present at this state.
 
-        Used by users.
-
-        ** Show form with predefined output ** -> /view/<uid>/<hcsf>/<endpoint_name>
+        ** Show form ** -> /view/<uid>/<form_number>
         - uid: user identifier
-        - hcsf: hashed state for the user
-        - endpoint_name: next endpoint
+        - form_number in multi form state
 
         GET:
             Display the form
         POST:
             Upload the form
 
-        Used by others to advance the worklow of a user.
-
         See `_view` for more details.
         """
 
         storage = hobj.storage
 
-        if endpoint_name is None:
-            try:
-                endpoint_name = storage.user_retrieve_state(uid)
-            except FileNotFoundError:
+        try:
+            state_name = storage.user_retrieve_state(uid).state
+        except FileNotFoundError:
+            return app_render_template("message.html", message=common.MSG_INVALID_UID)
+
+        state = hobj.states[state_name]
+
+        if len(state.forms) == 0:
+            # No form given, try lo show page
+            return _view_page(uid, state_name)
+
+        if len(state.forms) != 1:
+            if form_number is None:
+                return app_render_template(
+                    "form_chooser.html",
+                    form_links=state.forms,
+                    view_link_for=lambda x: common.view_link_for(uid, x),
+                )
+            elif form_number >= len(state.forms):
                 return app_render_template(
                     "message.html", message=common.MSG_INVALID_UID
                 )
-        else:
-            current_hcsf = storage.statehash_for(uid)
-            if current_hcsf != hcsf:
-                return app_render_template(
-                    "message.html", message=common.MSG_INVALID_UID_HEP
-                )
 
         try:
-            return _view(uid, endpoint_name)
+            return _view_form_in_state(uid, state.forms[form_number or 0])
         except RequestEntityTooLarge:
             flash("El límite para los archivos es de 5Mb cada uno", "danger")
             return flask.redirect(url_for("view", uid=uid))
@@ -376,7 +401,19 @@ def create_app(path, app=None, production=False):
             flash(str(e), "danger")
             return flask.redirect(url_for("view", uid=uid))
 
-    def _view(uid, endpoint_name, form_data=None):
+    def _view_page(uid, state_name):
+
+        state = hobj.states[state_name]
+
+        if state.page_template:
+            _, tmpl, tmpl_vars = hobj.get_page(state.page_template, APP)
+            return app_render_template_previous(
+                uid, tmpl, tmpl_vars, **state.page_render_kw
+            )
+        else:
+            return app_render_template("message.html", message=common.MSG_NO_FORM_PAGE)
+
+    def _view_form_in_state(uid, fis):
         """Show a hymie endpoint (actual implementation).
 
         This is tightly coupled to the endpoint definition.
@@ -390,9 +427,8 @@ def create_app(path, app=None, production=False):
 
         Parameters
         ----------
-        uid
-        endpoint_name
-        form_data
+        uid : str
+        fis : schema.FormInState
 
         Returns
         -------
@@ -401,76 +437,70 @@ def create_app(path, app=None, production=False):
 
         storage = hobj.storage
 
-        ep = hobj.endpoints[endpoint_name]
-        form_action = ep.form_action
+        form_name = fis.form
+        form_cfg = hobj.forms[form_name]
 
-        json_form = {}
-        if form_action is None:
-            # if there is not form action we store the current endpoint as new state
-            # just to reference the transition
-            with storage.maybe_store_state(uid, endpoint_name) as hcsf:
-                hobj.storage.user_store(
-                    uid, endpoint_name, {"_hymie_operator": "admin"}
-                )
+        meta, tmpl, form_cls, tmpl_vars = hobj.get_form_by_name(form_name, APP)
 
+        kwargs = dict(form_cfg.template_render_kw or {})
+        kwargs.update(common.build_links(meta, uid, storage))
+
+        if flask.request.method == "GET":
+            # If this is a get request we try to fill the form with:
+            # - prefill data
+            # - previously filled data
+            # - data passed to this funcion
+            try:
+                stored_form_data = storage.user_retrieve(uid, form_name)
+            except FileNotFoundError:
+                stored_form_data = {}
+            except Exception as e:
+                logger.error(f"While trying to user_retrieve({uid}, {form_name}): {e}")
+                stored_form_data = {}
+
+            form_obj = form_cls(**stored_form_data)
+
+            return app_render_template_previous(
+                uid,
+                tmpl,
+                tmpl_vars,
+                user_email=storage.user_retrieve_email(uid),
+                form=form_obj,
+                **kwargs,
+            )
         else:
+            # If this is a post request we just get it
+            form_obj = form_cls()
 
-            meta, tmpl, form_cls, tmpl_vars = hobj.get_form(endpoint_name, APP)
+        if not form_obj.validate_on_submit():
+            common.flash_errors(form_obj)
 
-            prefill = dict(ep.form_prefill or {})
-            form_data = form_data or {}
+            return app_render_template_previous(
+                uid,
+                tmpl,
+                tmpl_vars,
+                user_email=storage.user_retrieve_email(uid),
+                form=form_obj,
+                **kwargs,
+            )
 
-            for k, v in prefill.items():
-                prefill_endpoint, key = v.split(".")
-                prefill[k] = storage.user_retrieve(uid, prefill_endpoint)[key]
+        json_form = hobj.storage.form_to_dict(form_obj)
 
-            if flask.request.method == "GET":
-                try:
-                    content = storage.user_retrieve(uid, endpoint_name)
-                    form = form_cls(**{**prefill, **content, **form_data})
-                except FileNotFoundError:
-                    form = form_cls(**prefill, **form_data)
-                except Exception as e:
-                    logger.error(
-                        f"While trying to user_retrieve({uid}, {endpoint_name}): {e}"
-                    )
-                    form = form_cls(**prefill, **form_data)
-            else:
-                form = form_cls(**form_data)
+        for condition in fis.conditional_next_state:
+            if (
+                app_string_render_template(condition.condition, form=json_form)
+                == "True"
+            ):
+                next_state = condition.next_state
+                break
+        else:
+            next_state = fis.next_state
 
-            if not form.validate_on_submit():
-                common.flash_errors(form)
+        with storage.maybe_store_state(
+            uid, next_state, store_form=(form_name, json_form)
+        ) as hcsf:
 
-                # build links
-                kwargs = {}
-                for k, v in meta.items():
-                    if not k.startswith("link"):
-                        continue
-                    endpoint_name = v[0].strip()
-                    kwargs[k] = view_link_for(storage, uid, endpoint_name)
-
-                previous = hobj.storage.user_retrieve_current(
-                    uid,
-                    tuple(
-                        v.split(".")[1] for v in tmpl_vars if v.startswith("previous.")
-                    ),
-                )
-
-                return app_render_template(
-                    tmpl,
-                    user_email=storage.user_retrieve_email(uid),
-                    form=form,
-                    previous=previous,
-                    **kwargs,
-                )
-
-            if form_action == "store":
-                json_form = hobj.storage.form_to_dict(form)
-                hobj.storage.user_store(uid, endpoint_name, json_form)
-
-        with storage.maybe_store_state(uid, ep.next_state) as hcsf:
-
-            for action in ep.actions:
+            for action in form_cfg.on_submit:
                 if isinstance(action, schema.Action):
 
                     # AFAIK there is no **safe** way to evaluate that contains user provided values
@@ -485,13 +515,11 @@ def create_app(path, app=None, production=False):
                     # action(app: FlaskForm, hobj: Hymie, uid: str, endpoint: str, form: dict, action_options: ?):
                     if isinstance(action, schema.ActionEmail):
                         hobj.action_email(
-                            APP, uid, endpoint_name, json_form, action, hcsf=hcsf
+                            APP, uid, form_name, json_form, action, hcsf=hcsf
                         )
 
                     elif isinstance(action, schema.ActionEmailForm):
-                        hobj.action_email_form(
-                            APP, uid, endpoint_name, json_form, action
-                        )
+                        hobj.action_email_form(APP, uid, form_name, json_form, action)
 
                     else:
                         raise Exception(
@@ -502,8 +530,10 @@ def create_app(path, app=None, production=False):
                     logger.error("Action is not a subclass of Action: %s " % action)
 
         try:
-            meta, tmpl, _ = hobj.get_page(endpoint_name, APP)
-            return app_render_template(tmpl)
+            _, tmpl, tmpl_vars = hobj.get_page(form_cfg.after_template, APP)
+            return app_render_template_previous(
+                uid, tmpl, tmpl_vars, **form_cfg.after_render_kw
+            )
         except FileNotFoundError:
             return app_render_template("message.html", message="Hecho")
 
@@ -515,28 +545,59 @@ def create_app(path, app=None, production=False):
     @auth.login_required
     def admin():
         """Entry point for the administrator interface.
-
-        Parameters
-        ----------
-        user : str
-            current logged user through htpasswd.
-
         """
         return flask.redirect(url_for("users"))
         return app_render_template(
             "admin/base.html", crumbs=[("Acceso administrativo", url_for("admin"))]
         )
 
+    @APP.route("/admin/view/<uid>/<state_name>", methods=("GET", "POST"))
+    @APP.route(
+        "/admin/view/<uid>/<state_name>/<int:form_number>", methods=("GET", "POST")
+    )
+    @auth.login_required
+    def admin_view(uid, state_name, form_number=None):
+        """Show a hymie endpoint (start).
+
+        There are two ways to access an endpoint
+
+        ** Show form ** -> /view/<uid>
+        - uid: user identifier
+
+        Used by users.
+
+        ** Show form with predefined output ** -> /view/<uid>/<hcsf>/<endpoint_name>
+        - uid: user identifier
+        - hcsf: hashed state for the user
+        - state_name: state to show
+        - form_number
+
+        GET:
+            Display the form
+        POST:
+            Upload the form
+
+        Used by others to advance the worklow of a user.
+
+        See `_view` for more details.
+        """
+
+        state = hobj.states[state_name]
+
+        try:
+            return _view_form_in_state(uid, state.admin_forms[form_number or 0])
+        except RequestEntityTooLarge:
+            flash("El límite para los archivos es de 5Mb cada uno", "danger")
+            return flask.redirect(url_for("view", uid=uid))
+        except Exception as e:
+            logger.error(e)
+            flash(str(e), "danger")
+            return flask.redirect(url_for("view", uid=uid))
+
     @APP.route("/admin/users")
     @auth.login_required
     def users():
         """Display the list of users.
-
-        Parameters
-        ----------
-        user : str
-            current logged user through htpasswd.
-
         """
         return app_render_template(
             "admin/users.html",
@@ -550,11 +611,6 @@ def create_app(path, app=None, production=False):
     @auth.login_required
     def users_data():
         """json list of users.
-
-        Parameters
-        ----------
-        user : str
-            current logged user through htpasswd.
 
         Returns
         -------
@@ -574,9 +630,9 @@ def create_app(path, app=None, production=False):
         return jsonify(data=out)
 
     @APP.route("/admin/history/<uid>")
-    @APP.route("/admin/history/<uid>/<plain_endpoint>/<timestamp>")
+    @APP.route("/admin/history/<uid>/<form_name>/<timestamp>")
     @auth.login_required
-    def history(uid, plain_endpoint=None, timestamp=None):
+    def history(uid, form_name=None, timestamp=None):
         """Display the history for a given user.
 
         The endpoint and timestamp can be also provided.
@@ -586,10 +642,8 @@ def create_app(path, app=None, production=False):
 
         Parameters
         ----------
-        user : str
-            current logged user through htpasswd.
         uid : str
-        plain_endpoint : str or None
+        form_name : str or None
         timestamp : str or None
 
         """
@@ -601,23 +655,25 @@ def create_app(path, app=None, production=False):
         except Exception:
             fuid = None
 
-        (
-            current_state,
-            current_timestamp,
-            current_origin,
-        ) = hobj.storage.user_retrieve_state_timestamp_origin(uid)
+        current_state = hobj.storage.user_retrieve_state(uid)
 
-        if plain_endpoint is None:
+        # No form name given, show history.
+
+        if form_name is None:
             return app_render_template(
                 "/admin/history.html",
                 uid=uid,
                 friendly_user_id=fuid,
-                state=current_state,
-                timestamp=storage.pprint_timestamp(current_timestamp, locale="es"),
+                state=current_state.state,
+                timestamp=storage.pprint_timestamp(
+                    current_state.timestamp, locale="es"
+                ),
                 user_email=user_email,
                 action_zone=True,
-                admin_links=hobj.endpoints[current_state].admin_links,
-                view_link_for=lambda x: view_link_for(hobj.storage, uid, x),
+                admin_forms=hobj.states[current_state.state].admin_forms,
+                view_admin_link_for=lambda x: common.view_admin_link_for(
+                    uid, current_state.state, x
+                ),
                 crumbs=[
                     ("Acceso administrativo", url_for("admin")),
                     ("Usuarios", url_for("users")),
@@ -625,42 +681,55 @@ def create_app(path, app=None, production=False):
                 ],
             )
 
+        # Form name was given, show it.
+
         if timestamp is None:
-            content = hobj.storage.user_retrieve(uid, plain_endpoint)
+            # Get last form submission
+            content = hobj.storage.user_retrieve(uid, form_name)
             timestamp = content["_hymie_timestamp"]
         else:
-            dated_endpoint = plain_endpoint + "_" + timestamp
-            content = hobj.storage.user_retrieve(uid, dated_endpoint)
+            content = hobj.storage.user_retrieve(uid, form_name + "_" + timestamp)
 
-        try:
-            meta, tmpl, form_cls, tmpl_vars = hobj.get_form(
-                plain_endpoint, APP, read_only=True, extends="/admin/display_form.html"
-            )
-            form = form_cls(**content)
-        except Exception:
-            tmpl = "/admin/noform.html"
-            form = None
+        form_dated_tuple = (form_name, timestamp)
 
-        return app_render_template(
+        tmpl_vars = set()
+        if {"_hymie_endpoint", "_hymie_timestamp"} != set(content.keys()):
+            try:
+                meta, tmpl, form_cls, tmpl_vars = hobj.get_form_by_name(
+                    form_name, APP, read_only=True, extends="/admin/display_form.html"
+                )
+                form_obj = form_cls(**content)
+            except Exception:
+                tmpl = "/admin/noform.html"
+                form_obj = None
+        else:
+            tmpl = "/admin/display_form_no_data.html"
+            form_obj = None
+
+        return app_render_template_previous(
+            uid,
             tmpl,
-            form=form,
+            tmpl_vars,
+            form=form_obj,
             friendly_user_id=fuid,
-            endpoint=plain_endpoint,
+            endpoint=form_name,
             timestamp=storage.pprint_timestamp(timestamp, locale="es"),
             user_email=hobj.storage.user_retrieve_email(uid),
-            action_zone=((plain_endpoint, timestamp) == current_origin),
-            admin_links=hobj.endpoints[current_state].admin_links,
-            view_link_for=lambda x: view_link_for(hobj.storage, uid, x),
+            action_zone=(form_dated_tuple == current_state.form_dated_tuple),
+            admin_forms=hobj.states[current_state.state].admin_forms,
+            view_admin_link_for=lambda x: common.view_admin_link_for(
+                uid, current_state.state, x
+            ),
             crumbs=[
                 ("Acceso administrativo", url_for("admin")),
                 ("Usuarios", url_for("users")),
                 ("Historial de " + user_email, url_for("history", uid=uid)),
                 (
-                    "Formulario `%s`" % plain_endpoint,
+                    "Formulario `%s` (%s)" % (form_name, timestamp),
                     url_for(
                         "history",
                         uid=uid,
-                        plain_endpoint=plain_endpoint,
+                        plain_endpoint=form_name,
                         timestamp=timestamp,
                     ),
                 ),
@@ -674,8 +743,6 @@ def create_app(path, app=None, production=False):
 
         Parameters
         ----------
-        user : str
-            current logged user through htpasswd.
         uid : str
 
         Returns
@@ -685,7 +752,9 @@ def create_app(path, app=None, production=False):
 
         out = []
         previous = None
-        for timestamp, endpoint in hobj.yield_user_index_for(uid):
+        history = hobj.storage.user_retrieve_state_history(uid)
+        for timestamp in sorted(history.keys()):
+            state = history[timestamp]
             dt = storage.timestamp_to_datetime(timestamp)
             if previous is None:
                 previous = storage.timestamp_to_datetime(timestamp)
@@ -694,7 +763,7 @@ def create_app(path, app=None, production=False):
                 delta = dt - previous
                 previous = dt
                 extra = " (+%d dias)" % int(delta.days)
-            out.append((dt.format() + extra, endpoint, (endpoint, timestamp)))
+            out.append((dt.format() + extra, state.state, state.form_dated_tuple))
         return jsonify(data=out)
 
     @APP.route("/endpoint_descriptions")
@@ -705,6 +774,6 @@ def create_app(path, app=None, production=False):
         -------
         json str
         """
-        return jsonify({k: v.description for k, v in hobj.endpoints.items()})
+        return jsonify({k: v.description for k, v in hobj.states.items()})
 
     return APP
