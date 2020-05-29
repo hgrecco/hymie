@@ -4,7 +4,7 @@ from hymie.common import extract_jinja2_variables
 
 
 @pytest.mark.parametrize(
-    "template,vars",
+    "template,jinja_vars",
     [
         ("", set()),
         ("{{ hello }}", {"hello"}),
@@ -12,12 +12,12 @@ from hymie.common import extract_jinja2_variables
         ("{{ hello.my.friend }}", {"hello", "hello.my", "hello.my.friend"}),
     ],
 )
-def test_basic(template, vars):
-    assert extract_jinja2_variables(template) == vars
+def test_basic(template, jinja_vars):
+    assert extract_jinja2_variables(template) == jinja_vars
 
 
 @pytest.mark.parametrize(
-    "template,vars",
+    "template,jinja_vars",
     [
         ("", set()),
         ("{{ hello | upper }}", {"hello"}),
@@ -25,12 +25,12 @@ def test_basic(template, vars):
         ("{{ hello.my.friend | upper }}", {"hello", "hello.my", "hello.my.friend"}),
     ],
 )
-def test_modifiers(template, vars):
-    assert extract_jinja2_variables(template) == vars
+def test_modifiers(template, jinja_vars):
+    assert extract_jinja2_variables(template) == jinja_vars
 
 
 @pytest.mark.parametrize(
-    "template,vars",
+    "template,jinja_vars",
     [
         ("", set()),
         ("{{ hello + 42 }}", {"hello"}),
@@ -38,12 +38,12 @@ def test_modifiers(template, vars):
         ("{{ hello.my.friend + 42 }}", {"hello", "hello.my", "hello.my.friend"}),
     ],
 )
-def test_sum(template, vars):
-    assert extract_jinja2_variables(template) == vars
+def test_sum(template, jinja_vars):
+    assert extract_jinja2_variables(template) == jinja_vars
 
 
 @pytest.mark.parametrize(
-    "template,vars",
+    "template,jinja_vars",
     [
         ("", set()),
         ("{{ hello and 42 }}", {"hello"}),
@@ -51,12 +51,12 @@ def test_sum(template, vars):
         ("{{ hello.my.friend and 42 }}", {"hello", "hello.my", "hello.my.friend"}),
     ],
 )
-def test_and_const(template, vars):
-    assert extract_jinja2_variables(template) == vars
+def test_and_const(template, jinja_vars):
+    assert extract_jinja2_variables(template) == jinja_vars
 
 
 @pytest.mark.parametrize(
-    "template,vars",
+    "template,jinja_vars",
     [
         ("", set()),
         ("{{ hello and bye }}", {"hello", "bye"}),
@@ -67,12 +67,12 @@ def test_and_const(template, vars):
         ),
     ],
 )
-def test_and_var(template, vars):
-    assert extract_jinja2_variables(template) == vars
+def test_and_var(template, jinja_vars):
+    assert extract_jinja2_variables(template) == jinja_vars
 
 
 @pytest.mark.parametrize(
-    "template,vars",
+    "template,jinja_vars",
     [
         ("", set()),
         ("{{ hello }} {{ bye }}", {"hello", "bye"}),
@@ -83,5 +83,5 @@ def test_and_var(template, vars):
         ),
     ],
 )
-def test_two_parts(template, vars):
-    assert extract_jinja2_variables(template) == vars
+def test_two_parts(template, jinja_vars):
+    assert extract_jinja2_variables(template) == jinja_vars
