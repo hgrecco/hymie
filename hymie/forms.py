@@ -12,13 +12,7 @@ from types import SimpleNamespace
 
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileAllowed, FileField, FileRequired, FileStorage
-from wtforms import (  # DateField,
-    RadioField,
-    SelectField,
-    StringField,
-    SubmitField,
-    TextAreaField,
-)
+from wtforms import RadioField, SelectField, StringField, SubmitField, TextAreaField
 from wtforms import validators as v
 from wtforms.fields.html5 import DateField
 from wtforms.widgets.core import HTMLString, TextInput
