@@ -28,7 +28,7 @@ class Metadata(DataStruct):
     description: str
     maintainer: str
     maintainer_email: validators.Email
-    first_endpoint: str
+    first_state: str
     friendly_user_id: str = ""
 
 
@@ -98,17 +98,34 @@ class ConditionalNextState(DataStruct):
     next_state: str
 
 
-class Endpoint(DataStruct):
-    description: str
-    form_action: validators.value_in(None, "store", "show") = None
-    form_prefill: dict = {}
-    actions: List[AnyAction] = []
-    next_state: str = ""
-    admin_links: List[Link] = []
+class FormInState(DataStruct):
+    form: str
+    button_text: str = ""
+    button_tooltip: str = ""
+    button_type: str = ""
+    next_state: str
     conditional_next_state: List[ConditionalNextState] = []
+
+
+class State(DataStruct):
+    description: str
+    forms: List[FormInState] = []
+    admin_forms: List[FormInState] = []
+    page_template: str = ""
+    page_render_kw: Dict[str, str] = {}
+
+
+class Form(DataStruct):
+    description: str
+    template: str = ""
+    template_render_kw: Dict[str, str] = {}
+    on_submit: List[AnyAction] = []
+    after_template: str
+    after_render_kw: Dict[str, str] = {}
 
 
 class Root(DataStruct):
     metadata: Metadata
     config: Config
-    endpoints: Dict[str, Endpoint]
+    states: Dict[str, State]
+    forms: Dict[str, Form]
