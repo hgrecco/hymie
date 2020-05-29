@@ -12,7 +12,7 @@ import functools
 import logging
 import re
 
-from flask import flash
+from flask import flash, url_for
 from flask_wtf import FlaskForm
 from jinja2 import BaseLoader, Environment, nodes
 from wtforms import StringField, SubmitField
@@ -25,6 +25,78 @@ logger = logging.getLogger("hymie")
 BASE_JINJA_ENV = Environment(loader=BaseLoader())
 
 JINJA2_VAR_MATCHER = re.compile(r"{{([ \ta-zA-Z_][ \ta-zA-Z0-9_.|]*)}}")
+
+
+def view_link_for(uid, form_number=None):
+    """Create a link for an endpoint with predefined output.
+
+    Parameters
+    ----------
+    storage : storage.Storage
+    uid : str
+    endpoint_name : str
+
+    Returns
+    -------
+    str
+    """
+    if form_number is None:
+        return url_for("view_current_state", uid=uid, _external=True,)
+
+    return url_for(
+        "view_current_state", uid=uid, form_number=form_number, _external=True,
+    )
+
+
+def view_admin_link_for(uid, state_name, form_number=None):
+    """Create a link for an endpoint with predefined output.
+
+    Parameters
+    ----------
+    storage : storage.Storage
+    uid : str
+    endpoint_name : str
+
+    Returns
+    -------
+    str
+    """
+    if form_number is None:
+        return url_for("admin_view", uid=uid, state_name=state_name, _external=True,)
+
+    return url_for(
+        "admin_view",
+        uid=uid,
+        state_name=state_name,
+        form_number=form_number,
+        _external=True,
+    )
+
+
+def build_links(meta, uid, storage, _view_link_for=None, _view_admin_link_for=None):
+    if _view_link_for is None:
+        _view_link_for = view_link_for
+    if _view_admin_link_for is None:
+        _view_admin_link_for = view_admin_link_for
+
+    out = {}
+    for key, value in meta.items():
+        if not key.startswith("link"):
+            continue
+
+        value = value[0].replace(" ", "")
+        try:
+            start, *rest = value.split("/")
+            if start == "adm":
+                if len(rest) == 1:
+                    out[key] = _view_admin_link_for(uid, rest[0])
+                else:
+                    out[key] = _view_admin_link_for(uid, rest[0], int(rest[1]))
+            else:
+                out[key] = _view_link_for(uid, value)
+        except Exception:
+            out[key] = _view_link_for(uid, value)
+    return out
 
 
 def recurse_ga(node):
@@ -131,3 +203,4 @@ MSG_ERROR_SENDING = "Hubo un problema al enviar el e-mail."
 MSG_EMAIL_SENT = "Se envió un e-mail a %s. Por favor revisá su casilla."
 MSG_INVALID_UID = "El link de acceso es inválido."
 MSG_INVALID_UID_HEP = "El link de acceso es inválido para el estado del sistema."
+MSG_NO_FORM_PAGE = "No hay página ni formulario definido para este estado."
