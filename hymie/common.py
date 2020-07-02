@@ -19,6 +19,13 @@ from wtforms import StringField, SubmitField
 from wtforms import validators as v
 
 logger = logging.getLogger("hymie")
+logger.setLevel(logging.DEBUG)
+ch = logging.StreamHandler()
+ch.setLevel(logging.DEBUG)
+
+formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+ch.setFormatter(formatter)
+logger.addHandler(ch)
 
 # A jinja environment detached from the app.
 # Used to convert string to templates.

@@ -610,7 +610,7 @@ class Hymie:
         if first in self.states:
             logger.debug(f"first_state is '{first}'")
         else:
-            errs.extend(f"first_state not found: '{first}'")
+            errs.append(f"first_state not found: '{first}'")
 
         if self.metadata.friendly_user_id:
             errs.extend(
@@ -638,7 +638,7 @@ class Hymie:
             for fis in state.forms + state.admin_forms:
 
                 if fis.form not in self.forms:
-                    errs.extend(f"{err_prefix} the form {fis.form} is not in forms")
+                    errs.append(f"{err_prefix} the form {fis.form} is not in forms")
                     continue
 
                 for cne in fis.conditional_next_state:
