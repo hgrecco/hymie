@@ -43,6 +43,7 @@ class Email(DataStruct):
     timeout: int
     subject: str
     debug: bool = False
+    folder: str
 
 
 class Secret(DataStruct):
@@ -59,6 +60,7 @@ class Config(DataStruct):
     email: Email
     secret: Secret
     storage: Storage
+    logfile: str = None
 
 
 class Action(DataStruct):
