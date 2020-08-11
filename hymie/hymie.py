@@ -354,7 +354,10 @@ class Hymie:
         if r.status_code not in [
             250,
         ]:
-            raise Exception("Message not sent (code %s). Please retry" % r.status_code)
+            raise Exception(
+                "Message not sent (code %s). Please retry\n\n"
+                "%s" % (r.status_code, message.as_string())
+            )
 
     ##########
     # Actions

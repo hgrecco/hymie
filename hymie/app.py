@@ -523,13 +523,20 @@ def create_app(path, app=None, production=False):
 
                     # action(app: FlaskForm, hobj: Hymie, uid: str, endpoint: str, form: dict, action_options: ?):
                     if isinstance(action, schema.ActionEmail):
-                        hobj.action_email(
-                            APP, uid, form_name, json_form, action, hcsf=hcsf
-                        )
+                        try:
+                            hobj.action_email(
+                                APP, uid, form_name, json_form, action, hcsf=hcsf
+                            )
+                        except Exception as e:
+                            logger.error(str(e))
 
                     elif isinstance(action, schema.ActionEmailForm):
-                        hobj.action_email_form(APP, uid, form_name, json_form, action)
-
+                        try:
+                            hobj.action_email_form(
+                                APP, uid, form_name, json_form, action
+                            )
+                        except Exception as e:
+                            logger.error(str(e))
                     else:
                         raise Exception(
                             "Action not defined for type %s" % action.__class__
