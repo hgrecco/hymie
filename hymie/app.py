@@ -45,6 +45,17 @@ def create_app(path, app=None, production=False):
     Flask App
     """
 
+    hobj = Hymie(path, production)
+
+    if production and hobj.config.logfile:
+        from logging import handlers, DEBUG
+
+        handler = handlers.RotatingFileHandler(
+            hobj.config.logfile, maxBytes=2000, backupCount=10
+        )
+        handler.setLevel(DEBUG)
+        logger.addHandler(handler)
+
     if app is None:
         APP = flask.Flask("hymie")
     else:
@@ -61,8 +72,6 @@ def create_app(path, app=None, production=False):
     APP.config["FLASK_HTPASSWD_PATH"] = str(Path(path).joinpath(".htpasswd"))
     APP.config["FLASK_AUTH_REALM"] = "You are not an administrator yet!"
     auth = HTTPBasicAuth()
-
-    hobj = Hymie(path, production)
 
     hobj.integrity_check(APP)
 
