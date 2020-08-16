@@ -16,7 +16,7 @@ from wtforms import RadioField, SelectField, StringField, SubmitField, TextAreaF
 from wtforms import validators as v
 from wtforms.fields.html5 import DateField
 from wtforms.widgets.core import HTMLString, TextInput
-from wtforms_components import TimeField
+from wtforms_components import TimeField, read_only
 
 FORMATTERS = {}
 
@@ -140,6 +140,17 @@ def generate_form_cls(name, fields):
     return cls
 
 
+class ReadOnlyFlaskForm(FlaskForm):
+
+    _read_only_attrs = None
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self._read_only_attrs:
+            for attr_name in self._read_only_attrs:
+                read_only(getattr(self, attr_name))
+
+
 def generate_read_only_form_cls(name, fields):
     """Generate a Flask derived class that is read-only.
 
@@ -157,19 +168,13 @@ def generate_read_only_form_cls(name, fields):
     FlaskForm
 
     """
-    cls = type(name, (FlaskForm,), {})
+    cls = type(name, (ReadOnlyFlaskForm,), {})
     for label, field in fields.items():
         if field["type"] == "FileField":
             field = {**field, "type": "LinkField"}
-        elif field["type"] == "SelectField":
-            field = {**field, "type": "StringField"}
-        elif field["type"] == "TimeField":
-            field = {**field, "type": "StringField"}
-        elif field["type"] == "DateField":
-            field = {**field, "type": "StringField"}
-        field = generate_field(label, field)
-        field.kwargs["render_kw"] = dict(readonly=True)
-        setattr(cls, label, field)
+        setattr(cls, label, generate_field(label, field))
+
+    cls._read_only_attrs = tuple(fields.keys())
 
     return cls
 
