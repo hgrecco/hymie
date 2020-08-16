@@ -47,15 +47,6 @@ def create_app(path, app=None, production=False):
 
     hobj = Hymie(path, production)
 
-    if production and hobj.config.logfile:
-        from logging import handlers, DEBUG
-
-        handler = handlers.RotatingFileHandler(
-            hobj.config.logfile, maxBytes=2000, backupCount=10
-        )
-        handler.setLevel(DEBUG)
-        logger.addHandler(handler)
-
     if app is None:
         APP = flask.Flask("hymie")
     else:
