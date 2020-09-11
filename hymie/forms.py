@@ -172,6 +172,12 @@ def generate_read_only_form_cls(name, fields):
     for label, field in fields.items():
         if field["type"] == "FileField":
             field = {**field, "type": "LinkField"}
+        elif field["type"] == "DateField":
+            field = {**field, "type": "StringField"}
+        elif field["type"] == "TimeField":
+            field = {**field, "type": "StringField"}
+        elif field["type"] == "DateTimeField":
+            field = {**field, "type": "StringField"}
         setattr(cls, label, generate_field(label, field))
 
     cls._read_only_attrs = tuple(fields.keys())
