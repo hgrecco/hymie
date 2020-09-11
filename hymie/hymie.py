@@ -136,7 +136,11 @@ class Hymie:
                     try:
                         nuid = self.friendly_user_id_getter(uid)
                     except Exception:
-                        nuid = self.storage.user_retrieve_email(uid)
+                        try:
+                            nuid = self.storage.user_retrieve_email(uid)
+                        except Exception as e:
+                            logger.error(f"Cannot get information for {uid}: {e}")
+                            continue
 
                     state = self.storage.user_retrieve_state(uid)
                     yield (
@@ -535,13 +539,14 @@ class Hymie:
     def check_str_template(self, app, html, form_name=None):
         out = []
         for variable in extract_jinja2_variables(html):
-            if form_name and variable.startswith("form."):
-                msg = self.check_variable(
-                    app, form_name + "." + variable[len("form.") :]
-                )
-            else:
-                msg = self.check_variable(app, variable)
-
+            msg = self.check_prefixed_variable(app, form_name, variable, {})
+            # if form_name and variable.startswith("form."):
+            #     msg = self.check_variable(
+            #         app, form_name + "." + variable[len("form.") :]
+            #     )
+            # else:
+            #     msg = self.check_variable(app, variable)
+            #
             if msg is not True:
                 out.append(msg)
 
