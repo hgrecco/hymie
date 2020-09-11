@@ -20,7 +20,7 @@ from werkzeug.exceptions import RequestEntityTooLarge
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from . import common, schema, storage
-from .common import logger
+from .common import extract_jinja2_variables, logger
 from .hymie import Hymie
 
 flask_bootstrap.__version__ = "4.4.1"
@@ -178,6 +178,32 @@ def create_app(path, app=None, production=False):
 
     def app_string_render_template(s, **kwargs):
         return app_render_template(common.BASE_JINJA_ENV.from_string(s), **kwargs)
+
+    def check_condition(uid, condition, json_form):
+        if "previous." in condition:
+            tmpl_vars = extract_jinja2_variables(condition)
+            previous = hobj.storage.user_retrieve_current(
+                uid,
+                tuple(v.split(".")[1] for v in tmpl_vars if v.startswith("previous.")),
+            )
+            try:
+                return (
+                    app_string_render_template(
+                        condition, form=json_form, previous=previous
+                    )
+                    == "True"
+                )
+            except Exception as ex:
+                logger.error(
+                    f"While checking condition with previous {condition}, {json_form}, {previous}: {ex}"
+                )
+                raise ex
+        else:
+            try:
+                return app_string_render_template(condition, form=json_form) == "True"
+            except Exception as ex:
+                logger.error(f"While checking condition {condition}, {json_form}: {ex}")
+                raise ex
 
     ####################
     # Common Endpoints
@@ -487,10 +513,7 @@ def create_app(path, app=None, production=False):
         json_form = hobj.storage.form_to_dict(form_obj)
 
         for condition in fis.conditional_next_state:
-            if (
-                app_string_render_template(condition.condition, form=json_form)
-                == "True"
-            ):
+            if check_condition(uid, condition.condition, json_form):
                 next_state = condition.next_state
                 break
         else:
@@ -506,10 +529,7 @@ def create_app(path, app=None, production=False):
                     # AFAIK there is no **safe** way to evaluate that contains user provided values
                     # a boolean expression in python without a parser.
                     # As jinja already has a parser that is used everywhere, we reuse it here.
-                    if (
-                        app_string_render_template(action.condition, form=json_form)
-                        != "True"
-                    ):
+                    if not check_condition(uid, action.condition, json_form):
                         continue
 
                     # action(app: FlaskForm, hobj: Hymie, uid: str, endpoint: str, form: dict, action_options: ?):
