@@ -71,6 +71,10 @@ class Hymie:
             ]
         )
 
+        hymie_mtime = max(
+            [f.stat().st_mtime for f in pathlib.Path(__file__).parent.rglob("*")]
+        )
+
         logger.info(f"Loaded app definition from {files}")
 
         content: schema.Root = schema.Root.from_filenames(files)
@@ -90,6 +94,9 @@ class Hymie:
             maintainer=content.metadata.maintainer,
             maintainer_email=content.metadata.maintainer_email,
             yaml_timestamp=datetime.fromtimestamp(mtime).strftime("%Y-%m-%d-%H:%M"),
+            hymie_timestamp=datetime.fromtimestamp(hymie_mtime).strftime(
+                "%Y-%m-%d-%H:%M"
+            ),
         )
 
         self.storage = Storage(self.config.storage.path, self.config.storage.salt)
