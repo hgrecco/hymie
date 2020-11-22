@@ -477,7 +477,10 @@ def create_app(path, app=None, production=False):
             # - previously filled data
             # - data passed to this funcion
             try:
-                stored_form_data = storage.user_retrieve(uid, form_name)
+                stored_form_data = storage.user_retrieve_form_data(
+                    uid, form_name, form_cls
+                )
+                # stored_form_data = {}
             except FileNotFoundError:
                 stored_form_data = {}
             except Exception as e:

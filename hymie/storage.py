@@ -383,6 +383,21 @@ class Storage:
         file = self.path.joinpath(uid, endpoint).with_suffix(".json")
         return _retrieve(file)
 
+    def user_retrieve_form_data(self, uid, endpoint, form_cls):
+        data = self.user_retrieve(uid, endpoint)
+        # noinspection PyProtectedMember
+        for name, value in data.items():
+            field = getattr(form_cls, name, None)
+            if field is None:
+                continue
+            field_type = field.__dict__["field_class"].__name__
+            if field_type == "DateField":
+                data[name] = arrow.get(value, "DD/MM/YY").datetime
+            elif field_type == "TimeField":
+                data[name] = arrow.get(value, "HH:mm").datetime
+
+        return data
+
     def user_retrieve_current(self, uid, endpoints):
         """Retrieve the content of all non-system endpoints at the most recent dates.
 
