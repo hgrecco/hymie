@@ -7,6 +7,18 @@
 <main role="main">
    <div class="album py-5 bg-light">
         <div class="container">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+            <div class="row">
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }}" role="alert">
+                    <button type="button" class="close" data-dismiss="alert">×</button>
+                    {{ message }}
+                </div>
+            {% endfor %}
+            </div>
+            {% endif %}
+            {% endwith %}
             <div class="row">
                 <div class="container alert alert-info">
                     <p><b>Usuario: </b>
@@ -34,22 +46,29 @@
                 </div>
             </div>
             <hr>
-<table id="example" class="display" style="width:100%">
-        <thead>
-            <tr>
-                <th>Dia y hora</th>
-                <th>Estado</th>
-                <th>Formulario</th>
-            </tr>
-        </thead>
-        <tfoot>
-            <tr>
-                <th>Dia y hora</th>
-                <th>Formulario</th>
-                <th>Formulario</th>
-            </tr>
-        </tfoot>
-    </table>
+            <table id="example" class="display" style="width:100%">
+                <thead>
+                    <tr>
+                        <th>Dia y hora</th>
+                        <th>Estado</th>
+                        <th>Formulario</th>
+                    </tr>
+                </thead>
+                <tfoot>
+                    <tr>
+                        <th>Dia y hora</th>
+                        <th>Estado</th>
+                        <th>Formulario</th>
+                    </tr>
+                </tfoot>
+            </table>
+            <!--
+            <div class="row">
+                <div class="container alert border border-primary rounded text-right">
+                    <a role="button" class="btn btn-danger" href="{{ url_for('archive', uid=uid) }}"  data-toggle="tooltip" data-placement="top" title="Archivar este usuario">Archivar</a>
+                </div>
+            </div>
+            -->
         </div>
    </div>
 </main>
