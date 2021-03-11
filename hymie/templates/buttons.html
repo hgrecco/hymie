@@ -1,0 +1,31 @@
+{%- extends "simple.html" %}
+
+{% block inner_simple %}
+    {{ super() }}
+    <p>{{msg}}</p>
+    <hr/>
+    <div class="row">
+        <div class="container text-center">
+            {% for link in form_links %}
+                <a role="button" class="btn hymie-button-{{ link.button_type }}" href="{{ link.url }}"  data-toggle="tooltip" data-placement="top" title="{{link.button_tooltip}}">{{ link.button_text }}</a>
+            {% endfor %}
+        </div>
+    </div>
+    <hr/>
+{% endblock %}
+
+
+{% block scripts %}
+{{super()}}
+<script language="JavaScript">
+$(document).ready(function() {
+    $(function () {
+        $('[data-toggle="tooltip"]').tooltip();
+        $(".hymie-button-accept").addClass("btn-success");
+        $(".hymie-button-reject").addClass("btn-danger");
+        $(".hymie-button-info").addClass("btn-info");
+    })
+} );
+</script>
+
+{% endblock %}
