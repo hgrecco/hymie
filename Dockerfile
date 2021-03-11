@@ -1,6 +1,6 @@
 # Dockerfile-flask# We simply inherit the Python 3 image. This image does
 # not particularly care what OS runs underneath
-FROM python:3
+FROM python:3.8
 
 # Set an environment variable with the directory
 # where we'll be running the app
