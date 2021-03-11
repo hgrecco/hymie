@@ -8,10 +8,13 @@
     :license: BSD, see LICENSE for more details.
 """
 
+import random
+import string
 from pathlib import Path
 
 import flask
 import flask_bootstrap
+import itsdangerous
 from flask import Markup, flash, jsonify, render_template, send_from_directory, url_for
 from flask_bootstrap import Bootstrap
 from flask_httpauth import HTTPBasicAuth
@@ -27,6 +30,11 @@ flask_bootstrap.__version__ = "4.4.1"
 flask_bootstrap.BOOTSTRAP_VERSION = flask_bootstrap.get_bootstrap_version(
     flask_bootstrap.__version__
 )
+
+
+def random_string(length):
+    chars = string.ascii_letters + string.digits + "!@#$%^&*()"
+    return "".join(random.choice(chars) for i in range(length))
 
 
 def create_app(path, app=None, production=False):
@@ -46,6 +54,8 @@ def create_app(path, app=None, production=False):
     """
 
     hobj = Hymie(path, production)
+
+    SIGNER = itsdangerous.TimestampSigner(random_string(42))
 
     if app is None:
         APP = flask.Flask("hymie")
@@ -658,6 +668,62 @@ def create_app(path, app=None, production=False):
                 )
             )
         return jsonify(data=out)
+
+    @APP.route("/admin/archive/<uid>")
+    @APP.route("/admin/archive/<uid>/<outcome>/<token>")
+    def archive(uid, outcome=None, token=None):
+
+        try:
+            email = hobj.storage.user_retrieve_email(uid)
+        except Exception:
+            flash(f"No se pudo recuperar los datos para {uid}")
+            return flask.redirect(url_for("users"))
+
+        if outcome is None:
+            links = [
+                dict(
+                    button_type="reject",
+                    button_tooltip="Archivar este circuito.",
+                    button_text="Archivar",
+                    url=url_for(
+                        "archive", uid=uid, outcome="archive", token=SIGNER.sign(uid)
+                    ),
+                ),
+                dict(
+                    button_type="info",
+                    button_tooltip="Cancelar",
+                    button_text="Cancelar operación",
+                    url=url_for("history", uid=uid),
+                ),
+            ]
+            return app_render_template(
+                "/buttons.html",
+                form_links=links,
+                msg="¿Realmente desea archivar este circuito?",
+            )
+
+        try:
+            suid = SIGNER.unsign(token, max_age=5 * 60)
+        except itsdangerous.exc.BadTimeSignature:
+            flash("Token de seguridad caduco", "danger")
+            return flask.redirect(url_for("history", uid=uid))
+        except itsdangerous.exc.BadSignature:
+            flash("Token de seguridad inválido", "danger")
+            return flask.redirect(url_for("history", uid=uid))
+
+        if suid != bytes(uid, encoding="utf-8"):
+            flash("Token de seguridad incorrecto", "danger")
+            # flash(suid, "danger")
+            # flash(uid, "danger")
+            return flask.redirect(url_for("history", uid=uid))
+
+        try:
+            hobj.storage.archive(uid)
+            flash(f"Usuario {email} archivado")
+        except Exception:
+            flash(f"No se pudo arhivar al usuario {email}")
+
+        return flask.redirect(url_for("users"))
 
     @APP.route("/admin/history/<uid>")
     @APP.route("/admin/history/<uid>/<form_name>/<timestamp>")
