@@ -185,10 +185,12 @@ class Storage:
 
         #: Path to keep the uploaded files.
         self.upload_path = self.path.joinpath("uploads")
+        self.archived_path = self.path.joinpath("archived")
 
         #: We create the folders (if necessary)
         self.path.mkdir(parents=True, exist_ok=True)
         self.upload_path.mkdir(parents=True, exist_ok=True)
+        self.archived_path.mkdir(parents=True, exist_ok=True)
 
         salt_file = self.path.joinpath("salt.txt")
         if salt_file.exists():
@@ -252,13 +254,22 @@ class Storage:
         """
         return self.folder_for(email).exists()
 
+    def archive(self, uid):
+        dst = self.archived_path.joinpath(uid)
+        src = self.path.joinpath(uid)
+        n = 0
+        while dst.exists():
+            dst = self.archived_path.joinpath(uid).with_suffix(f"_{n}")
+            n = n + 1
+        src.rename(dst)
+
     def yield_uids(self):
         """Yield all uid.
         """
         for f in self.path.iterdir():
             if not f.is_dir():
                 continue
-            if f.stem != "uploads":
+            if f.stem not in ("uploads", "archived", "_server"):
                 yield f.stem
 
     def retrieve_scheduled_emails(self):
